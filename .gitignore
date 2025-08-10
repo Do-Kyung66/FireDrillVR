@@ -1,0 +1,29 @@
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# IDE
+.vscode/
+.vs/
+
+# Visual Studio / Xcode
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.opendb
+*.sdf
+*.suo
+*.xcodeproj
+*.xcworkspace
+
+# Personal / Temp files
+*.log
+*.tlog
+*.ipch
+*.pdb
+*.obj
+*.iobj
+*.ipdb
