@@ -42,8 +42,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	class UInputAction* IA_Mouse;
 
-	bool bUsingMouse = false;
-
 	// ¿‚±‚
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	class UInputAction* IA_Grab;

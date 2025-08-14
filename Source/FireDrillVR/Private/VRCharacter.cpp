@@ -103,20 +103,14 @@ void AVRCharacter::Move(const struct FInputActionValue& Values)
 
 void AVRCharacter::Turn(const struct FInputActionValue& Values)
 {
-	/*if (bUsingMouse == false)
-	{
-		return;
-	}*/
-
 	FVector2d Scale = Values.Get<FVector2d>();
 	AddControllerPitchInput(-Scale.Y);
 	AddControllerYawInput(Scale.X);
-
 }
 
 void AVRCharacter::TryGrab(const struct FInputActionValue& Values)
 {
-
+	
 }
 
 void AVRCharacter::TryUnGrab(const struct FInputActionValue& Values)
