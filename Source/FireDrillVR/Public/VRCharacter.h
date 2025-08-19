@@ -49,11 +49,20 @@ public:
 	bool bIsGrabbing = false;
 
 	UPROPERTY(EditAnywhere, Category = "Grab")
-	float GrabRadius = 100;
+	float GrabRadius = 20;
 
 	// 잡은 물체 기억할 변수
 	UPROPERTY()
 	class UPrimitiveComponent* grabbedObject;
+
+	// 진동 (엘리베이터 탈 경우)
+	UPROPERTY(EditDefaultsOnly, Category = "Haptic")
+	class UHapticFeedbackEffect_Curve* ElevatorHaptic;
+
+	// 핸드 애니메이션 (소화기 작동 시)
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	class UInputMappingContext* IMC_Hand;
+
 
 public:
 	// 함수
@@ -61,5 +70,6 @@ public:
 	void Turn(const struct FInputActionValue& Values);
 	void TryGrab(const struct FInputActionValue& Values);
 	void TryUnGrab(const struct FInputActionValue& Values);
+	void Grabbing();
 
 };

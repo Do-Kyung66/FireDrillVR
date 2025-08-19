@@ -110,11 +110,79 @@ void AVRCharacter::Turn(const struct FInputActionValue& Values)
 
 void AVRCharacter::TryGrab(const struct FInputActionValue& Values)
 {
-	
+	// 소화기를 집는다
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	FVector HandPose = LeftHand->GetComponentLocation();
+	TArray<FOverlapResult> HitObjects;
+	bool bHit = GetWorld()->OverlapMultiByChannel(HitObjects, HandPose, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(GrabRadius), Params);
+
+	if (bHit == false) return;
+
+	for (auto& Hit : HitObjects)
+	{
+		AActor* HitActor = Hit.GetActor();
+		if (HitActor)
+		{
+			if (HitActor->ActorHasTag(TEXT("FireExtinguisher")))
+			{
+				UPrimitiveComponent* HitComp = Hit.GetComponent();
+				if (HitComp && HitComp->IsSimulatingPhysics())
+				{
+					grabbedObject = HitComp;
+					bIsGrabbing = true;
+
+					grabbedObject->SetSimulatePhysics(false);
+					
+					grabbedObject->AttachToComponent(LeftHand, FAttachmentTransformRules::KeepWorldTransform, TEXT("GrabSocket"));
+
+					// 앞 방향으로 소화기 고정
+					FVector NewLoc = LeftHand->GetComponentLocation() + LeftHand->GetUpVector() * -20.f + LeftHand->GetRightVector() * 20.f;
+					FRotator HandRot = LeftHand->GetComponentRotation();
+					FRotator OffsetRot = FRotator(0.f, 180.f, 0.f);
+					FRotator NewRot = (HandRot.Quaternion() * OffsetRot.Quaternion()).Rotator();
+					grabbedObject->SetWorldLocationAndRotation(NewLoc, NewRot);
+
+
+					UE_LOG(LogTemp, Warning, TEXT("Grab!!!!!!!!!!!!!!!!!"));
+					break;
+				}
+			}
+		}
+	}
+
+	FColor SphereColor = bHit ? FColor::Green : FColor::Red;
+	DrawDebugSphere(
+		GetWorld(),
+		HandPose,    
+		GrabRadius,     
+		16,           
+		SphereColor, 
+		false,
+		1.0f,         
+		0,            
+		0.5f          
+	);
+
 }
 
 void AVRCharacter::TryUnGrab(const struct FInputActionValue& Values)
 {
+	// 소화기를 놓는다
+	if (bIsGrabbing == false) return;
 
+	bIsGrabbing = false;
+
+	grabbedObject->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	grabbedObject->SetSimulatePhysics(true);
+	grabbedObject->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	grabbedObject = nullptr;
+}
+
+void AVRCharacter::Grabbing()
+{
+	// 소화기 인터랙션
 }
 
