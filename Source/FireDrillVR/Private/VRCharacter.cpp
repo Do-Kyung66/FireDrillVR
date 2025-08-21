@@ -6,6 +6,8 @@
 #include "../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/EnhancedInputComponent.h"
 #include "../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/InputAction.h"
 #include "../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/InputMappingContext.h"
+#include "PhysicsEngine/PhysicsHandleComponent.h"
+#include "FireExtinguisherActor.h"
 
 
 AVRCharacter::AVRCharacter()
@@ -23,9 +25,8 @@ AVRCharacter::AVRCharacter()
 	RightHand->SetupAttachment(RootComponent);
 	RightHand->SetTrackingMotionSource(TEXT("Right"));
 
-	RightAim  = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightAim"));
-	RightAim->SetupAttachment(RootComponent);
-	RightAim->SetTrackingMotionSource(TEXT("RightAim"));
+	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
+	PhysicsHandle->InterpolationSpeed = 20.f; 
 
 	ConstructorHelpers::FObjectFinder<UInputMappingContext> TempIMC(TEXT("'/Game/HDK/Inputs/IMC_VRInput.IMC_VRInput'"));
 	if (TempIMC.Succeeded())
@@ -52,6 +53,18 @@ AVRCharacter::AVRCharacter()
 		IA_Grab = TempIA_Grab.Object;
 	}
 
+	ConstructorHelpers::FObjectFinder<UInputAction> TempIA_Spray(TEXT("'/Game/HDK/Inputs/IA_VRSpray.IA_VRSpray'"));
+	if (TempIA_Spray.Succeeded())
+	{
+		IA_Spray = TempIA_Spray.Object;
+	}
+
+	ConstructorHelpers::FObjectFinder<UInputAction> TempIA_OpenDoor(TEXT("'/Game/HDK/Inputs/IA_VROpenDoor.IA_VROpenDoor'"));
+	if (TempIA_OpenDoor.Succeeded())
+	{
+		IA_OpenDoor = TempIA_OpenDoor.Object;
+	}
+
 }
 
 void AVRCharacter::BeginPlay()
@@ -63,6 +76,16 @@ void AVRCharacter::BeginPlay()
 void AVRCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (bHoldingDoor && PhysicsHandle && PhysicsHandle->GetGrabbedComponent())
+	{
+		PhysicsHandle->SetTargetLocation(FixedGrabLoc);
+
+		const FRotator Cur = PhysicsHandle->GetGrabbedComponent()->GetComponentRotation();
+		const FRotator Hand = RightHand->GetComponentRotation();
+		const FRotator Smoothed = FMath::RInterpTo(Cur, Hand, DeltaTime, 3.f);
+		PhysicsHandle->SetTargetRotation(Smoothed);
+	}
 
 }
 
@@ -91,6 +114,12 @@ void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		
 		InputSystem->BindAction(IA_Grab, ETriggerEvent::Started, this, &AVRCharacter::TryGrab);
 		InputSystem->BindAction(IA_Grab, ETriggerEvent::Completed, this, &AVRCharacter::TryUnGrab);
+
+		InputSystem->BindAction(IA_OpenDoor, ETriggerEvent::Started, this, &AVRCharacter::OnDoorInteractStarted);
+		InputSystem->BindAction(IA_OpenDoor, ETriggerEvent::Completed, this, &AVRCharacter::OnDoorInteractCompleted);
+
+		InputSystem->BindAction(IA_Spray, ETriggerEvent::Started, this, &AVRCharacter::OnSprayStarted);
+		InputSystem->BindAction(IA_Spray, ETriggerEvent::Completed, this, &AVRCharacter::OnSprayCompleted);
 	}
 }
 
@@ -181,8 +210,82 @@ void AVRCharacter::TryUnGrab(const struct FInputActionValue& Values)
 	grabbedObject = nullptr;
 }
 
-void AVRCharacter::Grabbing()
+void AVRCharacter::OnSprayStarted(const FInputActionValue&)
 {
-	// 소화기 인터랙션
+	if(!bIsGrabbing || !grabbedObject) return;
+	if (auto* Ext = Cast<AFireExtinguisherActor>(grabbedObject->GetOwner()))
+		Ext->StartSpray();
+
+	UE_LOG(LogTemp, Warning, TEXT("Spray Start"));
+}
+
+void AVRCharacter::OnSprayCompleted(const FInputActionValue&)
+{
+	if (!bIsGrabbing || !grabbedObject) return;
+	if (auto* Ext = Cast<AFireExtinguisherActor>(grabbedObject->GetOwner()))
+		Ext->StopSpray();
+}
+
+void AVRCharacter::OnDoorInteractStarted(const FInputActionValue& Values)
+{
+	if(!RightHand || !PhysicsHandle) return;
+
+	const FVector Start = RightHand->GetComponentLocation();
+	const FVector End = Start + RightHand->GetForwardVector() * TraceDistance;
+
+	DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.0f, 0, 2.0f);
+
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(DoorTrace), false, this);
+	Params.AddIgnoredActor(this);
+
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
+
+	if (!bHit) return;
+
+	AActor* HitActor = Hit.GetActor();
+	USceneComponent* PivotComp = nullptr;
+
+	
+
+	if (!HitActor) return;
+
+	const bool bIsDoor = HitActor->ActorHasTag(TEXT("Door"));
+	if (!bIsDoor) return;
+
+	if (bIsDoor)
+	{
+		UPrimitiveComponent* DoorComp = Hit.GetComponent();
+
+		if(!DoorComp || !DoorComp->IsSimulatingPhysics()) return;
+
+		if (!PivotComp)
+		{
+			PivotComp = Cast<USceneComponent>(HitActor->FindComponentByClass<USceneComponent>());
+		}
+
+		const FVector Pivot = PivotComp ? PivotComp->GetComponentLocation() : Hit.ImpactPoint;
+		
+		PhysicsHandle->GrabComponentAtLocationWithRotation(DoorComp, NAME_None, Pivot, DoorComp->GetComponentRotation());
+
+		FixedGrabLoc = Pivot;
+	}
+
+	bHoldingDoor = true;
+	UE_LOG(LogTemp, Warning, TEXT("bHoldingDoor True"));
+	DrawDebugLine(GetWorld(), Start, End, FColor::Cyan, false, 1.0f, 0, 3.0f);
+}
+
+void AVRCharacter::OnDoorInteractCompleted(const FInputActionValue& Values)
+{
+	if (PhysicsHandle && PhysicsHandle->GetGrabbedComponent())
+	{
+		UPrimitiveComponent* Comp = PhysicsHandle->GetGrabbedComponent();
+		PhysicsHandle->ReleaseComponent();
+
+		/*Comp->SetSimulatePhysics(false);
+		Comp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);*/
+	}
+	bHoldingDoor = false;
 }
 

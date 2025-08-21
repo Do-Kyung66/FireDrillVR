@@ -29,9 +29,7 @@ public:
 	class UMotionControllerComponent* LeftHand;
 	UPROPERTY(VisibleAnywhere, Category = "MotionController")
 	class UMotionControllerComponent* RightHand;
-	UPROPERTY(VisibleAnywhere, Category = "MotionController")
-	class UMotionControllerComponent* RightAim;
-
+	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	class UInputMappingContext* IMC_VRInput;
 
@@ -55,6 +53,23 @@ public:
 	UPROPERTY()
 	class UPrimitiveComponent* grabbedObject;
 
+	// 소화기 쏘기
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	class UInputAction* IA_Spray;
+
+	// 문열기
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	class UInputAction* IA_OpenDoor;
+
+	UPROPERTY(EditAnywhere, Category = "Grab")
+	class UPhysicsHandleComponent* PhysicsHandle;
+
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float TraceDistance = 80.f;
+
+	bool bHoldingDoor = false;
+	FVector FixedGrabLoc;
+
 	// 진동 (엘리베이터 탈 경우)
 	UPROPERTY(EditDefaultsOnly, Category = "Haptic")
 	class UHapticFeedbackEffect_Curve* ElevatorHaptic;
@@ -63,6 +78,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	class UInputMappingContext* IMC_Hand;
 
+	
 
 public:
 	// 함수
@@ -70,6 +86,9 @@ public:
 	void Turn(const struct FInputActionValue& Values);
 	void TryGrab(const struct FInputActionValue& Values);
 	void TryUnGrab(const struct FInputActionValue& Values);
-	void Grabbing();
+	void OnSprayStarted(const FInputActionValue&);
+	void OnSprayCompleted(const FInputActionValue&);
+	void OnDoorInteractStarted(const FInputActionValue& Values);
+	void OnDoorInteractCompleted(const FInputActionValue& Values);
 
 };
